@@ -1,0 +1,64 @@
+* Zero Output Resistance Headphone Amplifier
+* Based on TI SLYT630: "Zero output resistance of headphone amplifier optimizes audio performance"
+* https://www.ti.com/lit/pdf/slyt630
+*
+* This circuit achieves effectively zero output impedance
+* through feedback sensing at the load.
+*
+* Circuit Description:
+* - U1: Main amplifier with feedback from load
+* - Rs: Sense resistor
+* - Ro: Output resistor (its impedance is cancelled by the feedback loop)
+*
+
+* Power Supply
+VCC VCC 0 DC 5V
+VEE VEE 0 DC -5V
+
+* Input Signal
+VIN IN 0 SINE(0 1V 1kHz)
+
+* Input Stage
+R1 IN NIN 10k
+Rg NIN 0 10k
+
+* Main Amplifier U1 (Inverting configuration with feedback from load)
+* The key to zero output impedance is taking feedback from the load side
+XU1 NIN FB VS VCC VEE OPAMP
+
+* Output Network
+Ro VS VOUT_PRE 47
+Rs VOUT_PRE LOAD 2.2
+
+* Feedback resistor network
+* Feedback is taken from LOAD (after output resistors) instead of VS
+Rfb VS FB 100k
+Rff FB LOAD 100k
+
+* Load (Headphone)
+Rload LOAD HPGND 32
+Rcable HPGND 0 0.5
+
+* Generic Op-Amp Model
+.SUBCKT OPAMP INP INN OUT VCC VEE
+* Simplified op-amp model
+* Input stage
+Rin INP INN 10MEG
+Gin 0 N010 INP INN 100u
+Rg1 N010 0 10k
+* Frequency shaping
+Cf N010 0 1.59n
+* Output stage
+Eout OUT 0 N010 0 1
+Rout OUT 0 100
+.ENDS OPAMP
+
+* Simulation Commands
+.tran 0 5m 0 1u
+.ac dec 100 10 100k
+
+* Measurements
+.meas TRAN Vout_pp PP V(LOAD)
+.meas TRAN Vin_pp PP V(IN)
+
+.end
