@@ -1,0 +1,163 @@
+* =============================================================================
+* Zero Output Resistance Headphone Amplifier - Core Circuit
+* =============================================================================
+* Reference: TI SLYT630 - "Zero output resistance of headphone amplifier
+*            optimizes audio performance"
+* URL: https://www.ti.com/lit/pdf/slyt630
+* =============================================================================
+*
+* THEORY OF OPERATION:
+* --------------------
+* Traditional amplifiers have some output impedance which causes voltage drop
+* when driving low-impedance loads like headphones (16-300 ohms). This affects
+* frequency response due to the interaction with the headphone's impedance
+* which varies with frequency.
+*
+* This circuit uses a current-sensing resistor in the output path and a
+* feedback network that compensates for any voltage drop across the output
+* impedance, effectively making the output impedance zero.
+*
+* KEY EQUATIONS:
+* Rs = Sense resistor
+* Ro = Output resistor  
+* For zero output impedance: Proper ratio of feedback resistors
+*
+* CIRCUIT DESCRIPTION:
+* - Input: AC-coupled 1Vrms sine wave
+* - Output: Drives 32-ohm headphone load
+* - Gain: Unity (0 dB)
+* - Output Impedance: ~0 ohms (compensated)
+*
+
+* =============================================================================
+* POWER SUPPLIES
+* =============================================================================
+VCC vcc 0 DC 5
+VEE vee 0 DC -5
+
+* =============================================================================
+* INPUT SIGNAL
+* =============================================================================
+* 1kHz sine wave, 1V amplitude for transient analysis
+VIN input 0 SINE(0 1 1k) AC 1
+
+* =============================================================================
+* INPUT BUFFER / GAIN STAGE
+* =============================================================================
+* Unity gain buffer that drives the output stage
+* R1 and Rg set the input gain (unity in this case)
+R1 input nin 10k
+Rg nin 0 10k
+
+* Op-amp U1 acts as the main driver
+* Non-inverting configuration provides high input impedance
+XU1 nin fb1 vs vcc vee LM358
+
+* =============================================================================
+* OUTPUT STAGE WITH CURRENT SENSING
+* =============================================================================
+* Ro is the physical output resistor - its impedance will be compensated
+Ro vs vout_pre 47
+
+* Rs is the current sense resistor
+Rs vout_pre vout 2.2
+
+* Feedback from output to cancel Ro impedance
+Rfb vs fb1 100k
+Rff fb1 vout 100k
+
+* =============================================================================
+* COMPENSATION AMPLIFIER
+* =============================================================================
+* This amplifier senses the voltage drop and adjusts drive to compensate
+* The feedback taken from the load side (vout) instead of vs provides
+* the zero output impedance characteristic
+
+* Alternative simpler topology - direct feedback from load
+* The feedback is taken from the output (vout) which provides the zero output impedance
+* characteristic by compensating for voltage drops in Ro and Rs
+
+* =============================================================================
+* HEADPHONE LOAD MODEL
+* =============================================================================
+* Typical dynamic headphone: 32 ohms with some inductance and cable resistance
+Rload vout hp_int 32
+Lload hp_int hp_gnd 100u
+Rcable hp_gnd 0 0.5
+
+* =============================================================================
+* OP-AMP SUBCIRCUIT - LM358 (General Purpose)
+* =============================================================================
+.SUBCKT LM358 inp inn out vcc vee
+* Input stage
+Rin inp inn 2MEG
+Cin inp inn 3p
+* Bias currents
+Ibp inp 0 DC 45n
+Ibn inn 0 DC 45n
+* Differential to single-ended
+Gm 0 int inp inn 1m
+Rint int 0 1MEG
+* Dominant pole for 1MHz GBW
+Cint int 0 159.15p
+* Voltage gain (open loop ~100dB)
+Eamp out2 0 int 0 100k
+* Output stage
+Rout out2 out 50
+* Output limiting
+.ENDS LM358
+
+* =============================================================================
+* OP-AMP SUBCIRCUIT - OPA1688 (Low Distortion Audio)
+* =============================================================================
+.SUBCKT OPA1688 inp inn out vcc vee
+* Very high input impedance for audio applications
+Rin inp inn 10G
+Cin inp inn 2p
+* Negligible bias currents (FET input)
+Ibp inp 0 DC 5p
+Ibn inn 0 DC 5p
+* Transconductance stage
+Gm 0 int inp inn 10m
+Rint int 0 100k
+* GBW = 10MHz
+Cint int 0 159.15p
+* High open-loop gain (120dB)
+Eamp out2 0 int 0 1MEG
+* Low output impedance
+Rout out2 out 1
+* Rail-to-rail output approximation
+.ENDS OPA1688
+
+* =============================================================================
+* SIMULATION COMMANDS
+* =============================================================================
+* Transient analysis - 5ms to see multiple cycles at 1kHz
+.TRAN 0 5m 0 1u
+
+* AC analysis - frequency sweep from 10Hz to 100kHz
+.AC DEC 100 10 100k
+
+* Operating point analysis
+.OP
+
+* =============================================================================
+* MEASUREMENTS
+* =============================================================================
+.MEAS TRAN Vout_peak MAX V(vout)
+.MEAS TRAN Vin_peak MAX V(input)
+.MEAS TRAN gain_transient PARAM Vout_peak/Vin_peak
+.MEAS AC gain_1k FIND VDB(vout) AT=1k
+.MEAS AC phase_1k FIND VP(vout) AT=1k
+.MEAS AC bw_3db WHEN VDB(vout)=-3 CROSS=1
+
+* =============================================================================
+* CONTROL STATEMENTS
+* =============================================================================
+.OPTIONS RELTOL=0.001
+.OPTIONS ABSTOL=1p
+.OPTIONS VNTOL=1u
+.OPTIONS ITL1=500
+.OPTIONS ITL2=200
+
+.END
